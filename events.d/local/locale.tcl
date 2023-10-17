@@ -6,31 +6,21 @@
 #
 ###############################################################################
 
-
 #
-# Spell the specified word using phonetic alphabet or plain letters depending
-# on the setting of the PHONETIC_SPELLING configuration variable.
-#
-#   word -- The word to spell
+# Spell the specified word using a phonetic alphabet
 #
 proc spellWord {word} {
-  variable Logic::CFG_PHONETIC_SPELLING
   set word [string tolower $word];
   for {set i 0} {$i < [string length $word]} {set i [expr $i + 1]} {
     set char [string index $word $i];
-    if {[regexp {[a-z0-9]} $char]} {
-      if {([info exists CFG_PHONETIC_SPELLING]) && \
-          ($CFG_PHONETIC_SPELLING == 0)} {
-        playMsg "Default" "$char";
-      } else {
-        playMsg "Default" "phonetic_$char";
-      }
+    if {$char == "*"} {
+      playMsg "Default" "star";
     } elseif {$char == "/"} {
       playMsg "Default" "slash";
     } elseif {$char == "-"} {
       playMsg "Default" "dash";
-    } elseif {$char == "*"} {
-      playMsg "Default" "star";
+    } elseif {[regexp {[a-z0-9]} $char]} {
+      playMsg "Default" "phonetic_$char";
     }
   }
 }
@@ -59,19 +49,26 @@ proc playTwoDigitNumber {number} {
     puts "*** WARNING: Function playTwoDigitNumber received a non two digit number: $number";
     return;
   }
-  
+
   set first [string index $number 0];
   if {($first == "0") || ($first == "O")} {
     playMsg "Default" $first;
-    playMsg "Default" [string index $number 1];
+    playMsg "Default" "[string index $number 1]";
   } elseif {$first == "1"} {
     playMsg "Default" $number;
   } elseif {[string index $number 1] == "0"} {
     playMsg "Default" $number;
   } else {
+    if { [string index $number 1] == "1"} {
+        playMsg "Default" "ein";
+    } elseif { [string index $number 1] == "2"} {
+        playMsg "Default" "zwo";
+    } else {
+        playMsg "Default" "[string index $number 1]";
+    }
     playMsg "Default" "[string index $number 0]X";
-    playMsg "Default" "[string index $number 1]";
   }
+
 }
 
 
@@ -83,7 +80,7 @@ proc playThreeDigitNumber {number} {
     puts "*** WARNING: Function playThreeDigitNumber received a non three digit number: $number";
     return;
   }
-  
+
   set first [string index $number 0];
   if {($first == "0") || ($first == "O")} {
     spellNumber $number
@@ -91,10 +88,10 @@ proc playThreeDigitNumber {number} {
     append first "00";
     playMsg "Default" $first;
     if {[string index $number 1] != "0"} {
-#      playMsg "Default" "and"
+      playMsg "Default" "and"
       playTwoDigitNumber [string range $number 1 2];
     } elseif {[string index $number 2] != "0"} {
-#      playMsg "Default" "and"
+      playMsg "Default" "and"
       playMsg "Default" [string index $number 2];
     }
   }
@@ -112,6 +109,11 @@ proc playThreeDigitNumber {number} {
 #	136.5	- onehundred and thirtysix point five
 #
 proc playNumber {number} {
+
+  if {[regexp {\-(\d+)?} $number]} {
+    playMsg "Default" "minus";
+  }
+
   if {[regexp {(\d+)\.(\d+)?} $number -> integer fraction]} {
     playNumber $integer;
     playMsg "Default" "decimal";
@@ -134,82 +136,29 @@ proc playNumber {number} {
   }
 }
 
-proc playPressure {number} {
-  if {[regexp {(\d+)\.(\d+)?} $number -> integer fraction]} {
-    playNumber $integer;
-    playMsg "Default" "decimal";
-    spellNumber $fraction;
-    return;
-  }
-
-  while {[string length $number] > 0} {
-    set len [string length $number];
-    if {$len == 1} {
-      playMsg "Default" $number;
-      set number "";
-    } elseif {$len == 3} {
-	playMsg "Default" "900";
-	playTwoDigitNumber [string range $number 1 2];
-	set number "";
-        } elseif {$len == 4} {
-	playMsg "Default" "1000";
-	playTwoDigitNumber [string range $number 2 3];
-	set number "";
-    } elseif {$len % 2 == 0} {
-      playTwoDigitNumber [string range $number 0 1];
-      set number [string range $number 2 end];
-    } else {
-      playThreeDigitNumber [string range $number 0 2];
-      set number [string range $number 3 end];
-    }
-  }
-}
 
 
-#
-# Say the time specified by function arguments "hour" and "minute".
-#
 proc playTime {hour minute} {
-  if {[scan $hour "%d" hour] != 1 || $hour < 0 || $hour > 23} {
-    error "playTime: Non digit hour or value out of range: $hour"
-  }
-  if {[scan $minute "%d" minute] != 1 || $minute < 0 || $minute > 59} {
-    error "playTime: Non digit minute or value out of range: $hour"
-  }
-  
-  playMsg "Clock" [expr $hour];
+  scan $hour "%d" hour;
+  scan $minute "%d" minute;
 
+  if {$hour == 0} {
+    set hour 0;
+  }
+  if {$hour == 1} {
+    playMsg "Default" "ein";
+  } else {
+    playNumber [expr $hour];
+  }
+  playMsg "Default" "uhr";
   if {$minute != 0} {
     if {[string length $minute] == 1} {
-      set minute "$minute";
+      playMsg "Default" "$minute";
     }
     playTwoDigitNumber $minute;
   }
-  
-  playSilence 50;
 }
 
-
-
 #
-# Say the given frequency as intelligently as popssible
+# This file has not been truncated
 #
-#   fq -- The frequency in Hz
-#
-proc playFrequency {fq} {
-  if {$fq < 1000} {
-    set unit "Hz"
-  } elseif {$fq < 1000000} {
-    set fq [expr {$fq / 1000.0}]
-    set unit "kHz"
-  } elseif {$fq < 1000000000} {
-    set fq [expr {$fq / 1000000.0}]
-    set unit "MHz"
-  } else {
-    set fq [expr {$fq / 1000000000.0}]
-    set unit "GHz"
-  }
-  playNumber [string trimright [format "%.3f" $fq] ".0"]
-  playMsg "Core" $unit
-}
-
